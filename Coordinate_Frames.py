@@ -11,6 +11,8 @@ from mainform import *
 from matplotlib import pyplot
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
+from scipy.stats import lognorm
+from scipy.interpolate import spline
 
 
 class MyWin(QtWidgets.QMainWindow):
@@ -32,6 +34,27 @@ class MyWin(QtWidgets.QMainWindow):
         self.bely = []
         self.belz = []
         plt.use('QT5Agg')
+
+    def build_plot(self, data, title=''):
+        n, h, labels = MyWin.sturges_rule(len(self.coord_df), max(data), min(data))
+        fig, ax = pyplot.subplots()
+        counts, bins, patches = ax.hist(np.asarray(data), bins=n, density=True, label='Нормализованная гистограмма')
+        pyplot.xticks(bins, labels)
+        shape, loc, scale = lognorm.fit(np.asarray(data), floc=0)
+        print('sigma = {}; mu = {}'.format(shape, np.log(scale)))
+        pdf = lognorm.pdf(bins, shape, loc, scale)
+        bins_new = np.linspace(bins.min(), bins.max(), 50)
+        smooth_line = spline(bins, pdf, bins_new)
+        ax.plot(bins_new, smooth_line, 'r', label='PDF логнормального распределения (\u03C3={})'.format(
+            round(shape * 100, 2)))
+        ax.set_yscale("log")
+        pyplot.title('{} HIST'.format(title))
+        pyplot.xlabel('{} coordinates'.format(title))
+        pyplot.ylabel('PDF {}'.format(title))
+        pyplot.legend(loc='upper right')
+        pyplot.ylim(bottom=0.0, top=1)
+        pyplot.grid(True, linestyle='--')
+        pyplot.show()
 
     def button_1_click(self):
         self.coord_df = MyWin.parser()
@@ -80,31 +103,13 @@ class MyWin(QtWidgets.QMainWindow):
         plt.pyplot.show()
 
     def button_5_click(self):
-        n, h, labels = MyWin.sturges_rule(len(self.coord_df), max(self.belx), min(self.belx))
-        fig, ax = plt.pyplot.subplots()
-        counts, bins, patches = ax.hist(self.belx, bins=n)
-        ax.set_xticks(bins)
-        bin_centers = 0.5 * np.diff(bins) + bins[:-1]
-        plt.pyplot.xticks(bin_centers, labels)
-        plt.pyplot.show()
+        self.build_plot(self.belx, 'BELX')
 
     def button_6_click(self):
-        n, h, labels = MyWin.sturges_rule(len(self.coord_df), max(self.bely), min(self.bely))
-        fig, ax = plt.pyplot.subplots()
-        counts, bins, patches = ax.hist(self.bely, bins=n)
-        ax.set_xticks(bins)
-        bin_centers = 0.5 * np.diff(bins) + bins[:-1]
-        plt.pyplot.xticks(bin_centers, labels)
-        plt.pyplot.show()
+        self.build_plot(self.bely, 'BELY')
 
     def button_7_click(self):
-        n, h, labels = MyWin.sturges_rule(len(self.coord_df), max(self.belz), min(self.belz))
-        fig, ax = plt.pyplot.subplots()
-        counts, bins, patches = ax.hist(self.belz, bins=n)
-        ax.set_xticks(bins)
-        bin_centers = 0.5 * np.diff(bins) + bins[:-1]
-        plt.pyplot.xticks(bin_centers, labels)
-        plt.pyplot.show()
+        self.build_plot(self.belz, 'BELZ')
 
     @staticmethod
     def parser():
@@ -123,9 +128,11 @@ class MyWin(QtWidgets.QMainWindow):
         n = 1 + math.floor(math.log2(N))
         h = (max - min) / n
         for i in range(n):
-            label = str(min) + '...' + str(math.floor(min + h))
+            # label = str(min) + '...' + str(math.floor(min + h))
+            # min += math.floor(h)
+            labels.append(min)
             min += math.floor(h)
-            labels.append(label)
+        labels.append(min)
         return n, h, labels
 
     # Back up the reference to the exceptionhook
